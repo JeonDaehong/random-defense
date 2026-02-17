@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-expo-app@latest . --template blank-typescript)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx:*)",
+      "Bash(./node_modules/.bin/tsc:*)",
+      "Bash(node node_modules/typescript/bin/tsc:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm view:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(find:*)",
+      "Bash(\"d:/mobile_defense/scripts/generate_sounds.js\":*)",
+      "Bash(node:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}
