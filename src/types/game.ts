@@ -5,9 +5,11 @@ export interface UnitStats {
   hp: number;
   attack: number;
   defense: number;
-  attackSpeed: number;
+  attackSpeed: number; // ms cooldown between attacks
   range: number;
   moveSpeed: number;
+  penetrationCount?: number; // 관통형 전용: 다중 타격 수
+  areaRadius?: number;       // 범위형 전용: 폭발 반경
 }
 
 export interface Unit {
@@ -93,11 +95,15 @@ export interface Commander {
   icon: string;
 }
 
-export type BossAbility = 'regen' | 'summon' | 'aoe_attack' | 'shield' | 'speed_boost';
+export type BossAbility = 'dash' | 'shield' | 'type_shift' | 'enrage' | 'phase_shift';
 export interface Boss extends Enemy {
   isBoss: true;
   bossAbility: BossAbility;
   abilityTimer: number;
+  bossWave: number;
+  bossPhase?: number;        // 50웨이브 보스 페이즈 (1/2/3)
+  abilityActiveTimer?: number; // 스킬 효과 지속시간 카운트다운
+  damageReduction?: number;   // 0~1, 받는 피해 감소율
 }
 
 export interface WaveConfig {

@@ -14,7 +14,9 @@
       "Bash(find:*)",
       "Bash(\"d:/mobile_defense/scripts/generate_sounds.js\":*)",
       "Bash(node:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(yes:*)",
+      "Bash(keytool:*)"
     ]
   }
 }

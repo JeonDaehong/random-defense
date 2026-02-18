@@ -27,6 +27,7 @@ export default function GameScreen() {
   const [activeModal, setActiveModal] = useState<PanelAction | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const [waveBanner, setWaveBanner] = useState<string | null>(null);
+  const [blink, setBlink] = useState(false);
   const lastTimeRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
 
@@ -40,6 +41,14 @@ export default function GameScreen() {
     SoundManager.init();
     return () => { SoundManager.cleanup(); };
   }, []);
+
+  // 위험 깜빡임
+  const enemyDanger = state.enemies.length >= 80 && state.phase === 'battle';
+  useEffect(() => {
+    if (!enemyDanger) { setBlink(false); return; }
+    const id = setInterval(() => setBlink(b => !b), 500);
+    return () => clearInterval(id);
+  }, [enemyDanger]);
 
   // requestAnimationFrame 기반 게임 루프
   useEffect(() => {
@@ -87,6 +96,7 @@ export default function GameScreen() {
           }
         }
         // 효과음 (setState 내이지만 비동기라 안전)
+        if (hasAttack) SoundManager.playAttack();
         if (hasKill) SoundManager.playExplosion();
         const waveStartEvt = events.find(e => e.type === 'wave_start');
         if (waveStartEvt) {
@@ -97,6 +107,7 @@ export default function GameScreen() {
         }
         if (events.some(e => e.type === 'boss_spawn')) SoundManager.playBossSpawn();
         if (events.some(e => e.type === 'game_over')) { SoundManager.playGameOver(); SoundManager.stopBgm(); }
+        if (events.some(e => e.type === 'victory')) { SoundManager.playWaveStart(); setWaveBanner('VICTORY!'); }
 
         const goldBonus = newState.commander?.ability === 'gold_boost'
           ? (1 + newState.commander.abilityValue / 100) : 1;
@@ -256,16 +267,10 @@ export default function GameScreen() {
         </View>
       )}
 
-      {/* 적 카운트 경고 */}
-      {state.enemies.length >= 80 && state.phase === 'battle' && (
-        <View style={styles.warningBanner}>
-          <Text style={styles.warningText}>
-            ⚠️ 적 {state.enemies.length}/{MAX_ENEMIES} - 위험!
-          </Text>
-        </View>
-      )}
-
       <View style={styles.mapArea}>
+        {enemyDanger && (
+          <View style={[styles.dangerBorder, { opacity: blink ? 0.7 : 0.2 }]} pointerEvents="none" />
+        )}
         <GameMap state={state} />
         {waveBanner && (
           <View style={styles.waveBannerOverlay}>
@@ -274,9 +279,30 @@ export default function GameScreen() {
             </Text>
           </View>
         )}
+        {enemyDanger && (
+          <View style={[styles.dangerTextWrap, { opacity: blink ? 1 : 0.3 }]} pointerEvents="none">
+            <Text style={styles.dangerText}>{state.enemies.length}/{MAX_ENEMIES}</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.midSpacer} />
+
+      {state.phase === 'victory' && (
+        <View style={[styles.gameOverOverlay, { backgroundColor: 'rgba(0,20,60,0.9)' }]}>
+          <Text style={[styles.gameOverTitle, { color: '#FFD700' }]}>VICTORY!</Text>
+          <Text style={styles.gameOverScore}>점수: {state.score}</Text>
+          <Text style={styles.gameOverWave}>50 웨이브 클리어!</Text>
+          <View style={styles.gameOverButtons}>
+            <TouchableOpacity style={[styles.retryBtn, { backgroundColor: '#FFD700' }]} onPress={resetGame}>
+              <Text style={[styles.retryBtnText, { color: '#000' }]}>다시하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.homeBtn} onPress={() => router.back()}>
+              <Text style={styles.homeBtnText}>메인으로</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {state.phase === 'game_over' && (
         <View style={styles.gameOverOverlay}>
@@ -393,20 +419,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  warningBanner: {
-    alignItems: 'center',
-    marginHorizontal: 10,
-    marginTop: 4,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(255, 0, 0, 0.2)',
-    borderWidth: 1,
-    borderColor: '#ff000066',
-    borderRadius: 8,
+  dangerBorder: {
+    position: 'absolute',
+    top: -2, left: -2, right: -2, bottom: -2,
+    borderWidth: 3,
+    borderColor: '#ff2222',
+    borderRadius: 12,
+    zIndex: 40,
   },
-  warningText: {
-    color: '#ff4444',
-    fontSize: 13,
+  dangerTextWrap: {
+    position: 'absolute',
+    top: 6, right: 8,
+    backgroundColor: 'rgba(180, 0, 0, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    zIndex: 41,
+  },
+  dangerText: {
+    color: '#fff',
+    fontSize: 11,
     fontWeight: '900',
+    letterSpacing: 1,
   },
   gameOverOverlay: {
     position: 'absolute',

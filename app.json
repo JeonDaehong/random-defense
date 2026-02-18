@@ -22,11 +22,22 @@
         "backgroundColor": "#1a1a2e"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.mobiledefense.game"
+      "package": "com.mobiledefense.game",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-audio"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d653816c-3dbc-4b0f-be0f-1655c9d82326"
+      }
+    },
+    "owner": "jeondaehong"
   }
 }

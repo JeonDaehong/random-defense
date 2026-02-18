@@ -12,10 +12,14 @@ const SFX_FILES: Record<SfxKey, number> = {
 };
 
 let muted = false;
+const lastPlayTime: Partial<Record<SfxKey, number>> = {};
 
 // 풀링: 동시 재생을 위해 매번 새 인스턴스 (짧은 효과음)
-async function playSfx(key: SfxKey, volume = 0.5) {
+async function playSfx(key: SfxKey, volume = 0.5, cooldownMs = 0) {
   if (muted) return;
+  const now = Date.now();
+  if (cooldownMs > 0 && lastPlayTime[key] && now - lastPlayTime[key]! < cooldownMs) return;
+  lastPlayTime[key] = now;
   try {
     const { sound } = await Audio.Sound.createAsync(SFX_FILES[key], {
       shouldPlay: true,
@@ -44,8 +48,8 @@ export const SoundManager = {
 
   async stopBgm() {},
 
-  playAttack() { playSfx('attack', 0.2); },
-  playExplosion() { playSfx('explosion', 0.35); },
+  playAttack() { playSfx('attack', 0.25, 150); },
+  playExplosion() { playSfx('explosion', 0.35, 100); },
   playWaveStart() { playSfx('wave_start', 0.4); },
   playGameOver() { playSfx('game_over', 0.5); },
   playBossSpawn() { playSfx('boss', 0.45); },

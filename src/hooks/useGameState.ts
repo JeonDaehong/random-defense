@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { GameState, Unit, Commander, Magic } from '../types/game';
+import { resetPendingHits } from '../engine/gameLoop';
 import {
   UNIT_SUMMON_COST, GAMBLE_COST, MAGIC_DRAW_COST,
   GAMBLE_REWARDS, GRADE_SELL_PRICE, MERGE_COST,
@@ -12,7 +13,7 @@ const DUMMY_NEXUS = { maxHp: 0, currentHp: 0, x: 0, y: 0 };
 
 export function createInitialState(commander: Commander | null): GameState {
   return {
-    gold: 500, wave: 0, phase: 'prepare',
+    gold: 300, wave: 0, phase: 'prepare',
     units: [], enemies: [],
     gates: [{ ...DUMMY_GATE }, { ...DUMMY_GATE, id: 1 }],
     nexus: { ...DUMMY_NEXUS },
@@ -116,7 +117,7 @@ export function useGameState(commander: Commander | null) {
   }, []);
 
   const updateState = useCallback((updater: (prev: GameState) => GameState) => { setState(updater); }, []);
-  const resetGame = useCallback(() => { setState(createInitialState(commander)); }, [commander]);
+  const resetGame = useCallback(() => { resetPendingHits(); setState(createInitialState(commander)); }, [commander]);
 
   return { state, summonUnit, placeUnit, gamble, upgrade, sellUnit, mergeUnits, drawMagic, updateState, resetGame };
 }
