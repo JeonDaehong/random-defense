@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { GameState, Unit, Commander, Magic } from '../types/game';
 import { resetPendingHits } from '../engine/gameLoop';
 import {
@@ -26,12 +26,18 @@ export function createInitialState(commander: Commander | null): GameState {
 export function useGameState(commander: Commander | null) {
   const [state, setState] = useState<GameState>(() => createInitialState(commander));
 
+  // stateRef: setState updater가 비동기인 New Architecture에서
+  // 유저 액션 시 최신 state를 동기적으로 읽기 위해 사용
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   // 유닛 소환 (골드만 차감, 배치는 별도)
   const summonUnit = useCallback((): Unit | null => {
-    let unit: Unit | null = null;
+    const current = stateRef.current;
+    if (current.gold < UNIT_SUMMON_COST) return null;
+    const unit = createUnit();
     setState(prev => {
-      if (prev.gold < UNIT_SUMMON_COST) return prev;
-      unit = createUnit();
+      if (prev.gold < UNIT_SUMMON_COST) return prev; // 안전 이중 체크
       return { ...prev, gold: prev.gold - UNIT_SUMMON_COST };
     });
     return unit;
@@ -46,31 +52,32 @@ export function useGameState(commander: Commander | null) {
   }, []);
 
   const gamble = useCallback((): { type: string; value: number; label: string } | null => {
-    let result: { type: string; value: number; label: string } | null = null;
+    const current = stateRef.current;
+    if (current.gold < GAMBLE_COST) return null;
+    const reward = weightedRandom(GAMBLE_REWARDS);
     setState(prev => {
       if (prev.gold < GAMBLE_COST) return prev;
-      const reward = weightedRandom(GAMBLE_REWARDS);
-      result = reward;
       let ns = { ...prev, gold: prev.gold - GAMBLE_COST };
       if (reward.type === 'gold') ns.gold += reward.value;
       else if (reward.type === 'magic') ns = { ...ns, magics: [...ns.magics, createRandomMagic()] };
       return ns;
     });
-    return result;
+    return reward;
   }, []);
 
   const upgrade = useCallback((type: 'penetrateAttack' | 'areaAttack' | 'singleAttack' | 'goldBonus' | 'gateHp'): boolean => {
-    let success = false;
+    if (type === 'gateHp') return false;
+    const current = stateRef.current;
+    const level = current.upgrades[type];
+    const cost = getUpgradeCost(level);
+    if (current.gold < cost) return false;
     setState(prev => {
-      if (type === 'gateHp') return prev; // deprecated
-      const level = prev.upgrades[type];
-      const cost = getUpgradeCost(level);
-      if (prev.gold < cost) return prev;
-      success = true;
-      const ns = { ...prev, gold: prev.gold - cost, upgrades: { ...prev.upgrades, [type]: level + 1 } };
-      return ns;
+      const lvl = prev.upgrades[type];
+      const c = getUpgradeCost(lvl);
+      if (prev.gold < c) return prev;
+      return { ...prev, gold: prev.gold - c, upgrades: { ...prev.upgrades, [type]: lvl + 1 } };
     });
-    return success;
+    return true;
   }, []);
 
   const sellUnit = useCallback((unitId: string) => {
@@ -82,35 +89,44 @@ export function useGameState(commander: Commander | null) {
   }, []);
 
   const mergeUnits = useCallback((unitIds: [string, string, string]): 'success' | 'fail' | 'destroy' => {
+    const current = stateRef.current;
+    const units = unitIds.map(id => current.units.find(u => u.id === id)).filter(Boolean) as Unit[];
+    if (units.length !== 3) return 'fail';
+    const first = units[0];
+    if (!units.every(u => u.attackType === first.attackType && u.grade === first.grade)) return 'fail';
+    const cost = MERGE_COST[first.grade];
+    if (current.gold < cost || first.grade === 'S') return 'fail';
+    const nextGrade = getNextGrade(first.grade);
+    if (!nextGrade) return 'fail';
+
+    const roll = Math.random();
     let result: 'success' | 'fail' | 'destroy' = 'fail';
+    let newUnit: Unit | null = null;
+    if (roll < MERGE_SUCCESS_RATE) {
+      result = 'success';
+      newUnit = createUnit(first.attackType, nextGrade);
+    } else if (roll >= MERGE_SUCCESS_RATE + MERGE_FAIL_RATE) {
+      result = 'destroy';
+    }
+
     setState(prev => {
-      const units = unitIds.map(id => prev.units.find(u => u.id === id)).filter(Boolean) as Unit[];
-      if (units.length !== 3) return prev;
-      const first = units[0];
-      if (!units.every(u => u.attackType === first.attackType && u.grade === first.grade)) return prev;
-      const cost = MERGE_COST[first.grade];
-      if (prev.gold < cost || first.grade === 'S') return prev;
-      const nextGrade = getNextGrade(first.grade);
-      if (!nextGrade) return prev;
-      const roll = Math.random();
+      const prevUnits = unitIds.map(id => prev.units.find(u => u.id === id)).filter(Boolean) as Unit[];
+      if (prevUnits.length !== 3 || prev.gold < cost) return prev;
       const remaining = prev.units.filter(u => !unitIds.includes(u.id));
-      if (roll < MERGE_SUCCESS_RATE) {
-        result = 'success';
-        return { ...prev, gold: prev.gold - cost, units: [...remaining, createUnit(first.attackType, nextGrade)] };
-      } else if (roll < MERGE_SUCCESS_RATE + MERGE_FAIL_RATE) {
-        result = 'fail'; return { ...prev, gold: prev.gold - cost };
-      } else {
-        result = 'destroy'; return { ...prev, gold: prev.gold - cost, units: remaining };
-      }
+      let ns = { ...prev, gold: prev.gold - cost };
+      if (result === 'success' && newUnit) ns = { ...ns, units: [...remaining, newUnit] };
+      else if (result === 'destroy') ns = { ...ns, units: remaining };
+      return ns;
     });
     return result;
   }, []);
 
   const drawMagic = useCallback((): Magic | null => {
-    let magic: Magic | null = null;
+    const current = stateRef.current;
+    if (current.gold < MAGIC_DRAW_COST) return null;
+    const magic = createRandomMagic();
     setState(prev => {
       if (prev.gold < MAGIC_DRAW_COST) return prev;
-      magic = createRandomMagic();
       return { ...prev, gold: prev.gold - MAGIC_DRAW_COST, magics: [...prev.magics, magic] };
     });
     return magic;

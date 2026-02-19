@@ -66,12 +66,13 @@ export default function GameScreen() {
       }
 
       const delta = Math.min(timestamp - lastTimeRef.current, 200);
-      lastTimeRef.current = timestamp;
 
       if (delta < 16) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
+
+      lastTimeRef.current = timestamp;
 
       updateState(prev => {
         if (prev.phase === 'game_over' || prev.phase === 'victory') return prev;
